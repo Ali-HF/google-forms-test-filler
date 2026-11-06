@@ -211,19 +211,21 @@ def text_answer(title, n, validation=None):
 
     t = (title or "").lower()
 
-    # Department question handling: exactly 39 from CS & IT, remaining 11 from other focus departments
+    # Department question handling: exactly 39 from CS & IT, 11 naturally interspersed from other focus departments
     if "department" in t or "dept" in t:
-        if n <= 39:
-            return "Computer Science & Information Technology"
-        else:
-            other_idx = (n - 40) % len(OTHER_DEPTS)
-            return OTHER_DEPTS[other_idx]
+        other_indices = {4, 9, 14, 18, 23, 27, 32, 36, 41, 45, 50}
+        if n in other_indices:
+            idx = sorted(list(other_indices)).index(n) % len(OTHER_DEPTS)
+            return OTHER_DEPTS[idx]
+        return "Computer Science & Information Technology"
 
-    # Campus cleanliness suggestion handling
+    # Campus cleanliness suggestion handling (Optional question)
+    # Natural student behavior: ~40% provide a suggestion, ~60% leave it blank
     if any(k in t for k in ["clean", "tidier", "campus", "garbage", "waste", "litter", "improvement"]):
-        if n % 5 == 0:
-            return random.choice(["More dustbins needed.", "Timely bin clearance is essential.", "Good initiative."])
-        return CAMPUS_CLEANLINESS_SUGGESTIONS[(n - 1) % len(CAMPUS_CLEANLINESS_SUGGESTIONS)]
+        # Fill on 40% of runs (indices ending in 1 or 3), leave blank on the rest
+        if (n % 5) in (1, 3):
+            return CAMPUS_CLEANLINESS_SUGGESTIONS[(n - 1) % len(CAMPUS_CLEANLINESS_SUGGESTIONS)]
+        return ""
 
     if "email" in t:
         return f"test{n}@example.com"
@@ -439,6 +441,7 @@ def main():
     ap.add_argument("url", help="Public Google Form URL (/viewform or forms.gle)")
     ap.add_argument("-n", type=int, default=10, help="Number of responses to submit (default: 10)")
     ap.add_argument("--delay", type=float, default=1.0, help="Delay in seconds between submissions (default: 1.0s)")
+    ap.add_argument("--start-index", type=int, default=1, help="Starting index for sequence generation (default: 1)")
     ap.add_argument("--dry-run", action="store_true", help="Inspect question schema without submitting any responses")
     ap.add_argument("--force", action="store_true", help="Bypass safety limits when submitting >100 responses")
     args = ap.parse_args()
@@ -472,22 +475,32 @@ def main():
     session.headers.update(HEADERS)
 
     ok_count = 0
-    for i in range(1, args.n + 1):
+    end_index = args.start_index + args.n - 1
+    for i in range(args.start_index, end_index + 1):
         payload = build_payload(items, i, fbzx, has_email_field)
-        try:
-            resp = session.post(post_url, data=payload, timeout=20)
-            success, msg = verify_submission(resp)
-            if success:
-                ok_count += 1
-                dept_val = payload.get("entry.53644475", "")
-                dept_info = f" ({dept_val})" if dept_val else ""
-                print(f"[{i}/{args.n}] Submitted successfully{dept_info}.")
-            else:
-                print(f"[{i}/{args.n}] FAILED: {msg}")
-        except Exception as e:
-            print(f"[{i}/{args.n}] Request error: {e}")
+        submitted = False
 
-        if i < args.n and args.delay > 0:
+        # Retry up to 3 times on transient connection drops
+        for attempt in range(1, 4):
+            try:
+                resp = session.post(post_url, data=payload, timeout=20)
+                success, msg = verify_submission(resp)
+                if success:
+                    ok_count += 1
+                    dept_val = payload.get("entry.53644475", "")
+                    dept_info = f" ({dept_val})" if dept_val else ""
+                    print(f"[{i}/{end_index}] Submitted successfully{dept_info}.")
+                    submitted = True
+                else:
+                    print(f"[{i}/{end_index}] FAILED: {msg}")
+                break
+            except Exception as e:
+                if attempt < 3:
+                    time.sleep(2 * attempt)
+                    continue
+                print(f"[{i}/{end_index}] Connection error after retries: {e}")
+
+        if i < end_index and args.delay > 0:
             time.sleep(args.delay)
 
     print(f"\nDone: {ok_count}/{args.n} responses submitted successfully.")
