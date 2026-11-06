@@ -1,114 +1,167 @@
-# Google Forms Test Filler 🚀
+<div align="center">
+
+# Google Forms Test Filler & Auto Submitter 🚀
+
+**A fast, dependency-free Python CLI tool to automate, populate, and submit synthetic test responses to public Google Forms.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/Ali-HF)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/Ali-HF/google-forms-test-filler/pulls)
+[![GitHub Stars](https://img.shields.io/github/stars/Ali-HF/google-forms-test-filler?style=social)](https://github.com/Ali-HF/google-forms-test-filler)
 
-A lightweight, dependency-free Python CLI tool designed to populate and smoke-test public Google Forms with realistic synthetic test responses.
+[Features](#-key-features) •
+[Quick Start](#-quick-start) •
+[Comparison](#-why-not-selenium-or-the-official-api) •
+[Question Types](#-supported-google-form-question-types) •
+[FAQ](#-frequently-asked-questions-faq) •
+[Safety & Guidelines](#-ethical-use--safety-guardrails)
 
-Built for developers, QA engineers, and researchers to verify **Google Sheets pipelines**, **Google Apps Script triggers**, and **webhook automations** without manually filling out forms dozens of times.
-
----
-
-## ⚠️ Ethical Use & Safety Disclaimer
-
-> **IMPORTANT:** This tool is intended **strictly for testing forms that you own or have explicit authorization to test**. 
->
-> Automated spamming, denial-of-service (DoS) attacks, or submitting unwanted data to third-party forms violates Google's Terms of Service and is strictly prohibited. Use responsibly.
+</div>
 
 ---
 
-## ✨ Features
+## 📌 Overview
 
-- **Zero Heavy Dependencies:** Relies only on the standard `requests` library. Single-file CLI implementation.
-- **Dynamic Schema Discovery:** Directly extracts and parses Google's internal `FB_PUBLIC_LOAD_DATA_` payload and hidden anti-CSRF tokens (`fbzx`).
-- **Comprehensive Question Support:**
-  - 📝 **Short Answer & Paragraph** (with intelligent contextual heuristics for names, emails, phones, numbers, and feedback)
-  - 🔘 **Multiple Choice & Dropdown**
-  - ☑️ **Checkboxes** (selects random non-empty subsets)
-  - 📏 **Linear Scale**
-  - 📊 **Grids** (Multiple-choice & Checkbox grids across all rows and columns)
-  - 📅 **Date & Time** (handles `_year`, `_month`, `_day`, `_hour`, `_minute` fields)
-  - 📄 **Multi-page Forms** (properly constructs sequential `pageHistory`)
-- **Real Submission Verification:** Detects Google Forms' "Silent 200 OK" trap by inspecting the response body to confirm whether submissions were actually recorded or if validation failed.
-- **Schema Validation Detection:** Identifies field-level validation rules (e.g., number ranges, regex constraints) from the form metadata.
-- **Safety Guardrails:**
-  - Includes `--dry-run` to inspect questions and preview payloads with **zero live submissions**.
-  - Default rate-limiting delays to prevent IP throttling or silent CAPTCHAs.
-  - Hard cap safeguards (`--force` required for batches > 100).
-  - Halts with clean notices on sign-in gated forms.
+**Google Forms Test Filler** is an open-source automation utility designed for developers, QA engineers, students, and researchers who need to **smoke-test Google Forms workflows** without manually typing dozens or hundreds of test submissions.
+
+If you are developing **Google Sheets automations**, **Google Apps Script triggers (`onFormSubmit`)**, **pivot tables**, or **webhook pipelines**, this tool lets you generate diverse, realistic test responses in seconds.
+
+> **💡 Zero setup required:** No Google Cloud project, no OAuth2 credentials, no API keys, and no heavy browser dependencies like Selenium or Puppeteer.
+
+---
+
+## ⚡ Why Not Selenium or the Official API?
+
+| Feature | `google-forms-test-filler` | Official Google Forms API | Selenium / Playwright |
+|---|---|---|---|
+| **Setup Complexity** | ⚡ **Zero (1 command)** | ❌ Complex (GCP Project, OAuth, Scopes) | ⚠️ High (Chromedriver, browser binaries) |
+| **Speed & Resource Usage** | ⚡ **Blazing Fast (<10MB RAM)** | ⚡ Fast (REST API) | 🐢 Heavy & Slow (Spawns full browser) |
+| **Google Sign-in Required?** | 🔓 **No (Anonymous public forms)** | 🔐 Yes (Service account / OAuth) | 🔐 Often prompts Google 2FA/login |
+| **Multi-page & Grids Support** | ✅ **Full Support** | ⚠️ Complex response schema | ✅ Supported |
+| **Verification of Success** | ✅ **Inspects DOM response** | ✅ API response code | ✅ UI confirmation |
+| **Dependencies** | 📦 **Only `requests`** | 📦 `google-api-python-client` | 📦 Browser engines & drivers |
+
+---
+
+## ✨ Key Features
+
+- **🚀 Lightweight & Pure Python:** Operates using only standard `requests`. Runs on Windows, macOS, Linux, and CI/CD pipelines.
+- **🔍 Automated Schema Discovery:** Automatically inspects and parses Google Forms' internal `FB_PUBLIC_LOAD_DATA_` JSON blob, discovering every question ID (`entry.XXXXX`), question type, required flags, and choices.
+- **🛡️ Built-in Rate-Limiting & Guardrails:**
+  - Includes `--dry-run` to preview questions and payloads with **zero live submissions**.
+  - Enforces configurable delay intervals (`--delay 1.0`) to respect Google's infrastructure.
+  - Safe batch thresholds (`--force` required for submissions exceeding 100).
+- **🎯 Full Google Question Type Compatibility:**
+  - 📝 **Short Answer & Paragraphs:** Heuristic context generation for realistic names, dummy emails, phone numbers, ages, and survey feedback.
+  - 🔘 **Multiple Choice & Dropdowns:** Random selection across available options.
+  - ☑️ **Checkboxes:** Generates realistic non-empty random subsets.
+  - 📏 **Linear Scales:** Random values across defined scale ranges.
+  - 📊 **Grids:** Full row-by-row mapping for multiple-choice and checkbox grids.
+  - 📅 **Dates & Times:** Formats `_year`, `_month`, `_day`, `_hour`, and `_minute` accurately.
+  - 📄 **Multi-Page Forms:** Automatically tracks and passes `pageHistory` across section breaks.
+- **🔎 "Silent 200 OK" Protection:** Unlike typical APIs, Google Forms returns HTTP `200` even when validation fails. This tool inspects the returned HTML body to verify confirmation and detect rejected submissions.
 
 ---
 
 ## 📦 Installation
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/Ali-HF/google-forms-test-filler.git
-   cd google-forms-test-filler
-   ```
+```bash
+# 1. Clone the repository
+git clone https://github.com/Ali-HF/google-forms-test-filler.git
+cd google-forms-test-filler
 
-2. **Install requirements:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+# 2. Install dependencies (only requests is required)
+pip install -r requirements.txt
+```
 
 ---
 
-## 🚀 Usage
+## 🚀 Quick Start
 
 ### 1. Dry Run (Inspect Form Schema without Submitting)
-Always inspect the form first to verify question discovery and test payload generation:
+Always run a dry run first to inspect the discovered question schema:
 ```bash
 python fill_form.py "https://docs.google.com/forms/d/e/XXXX/viewform" --dry-run
 ```
 *(Also supports short links like `https://forms.gle/XXXX`)*
 
-### 2. Submit Test Responses
+**Sample Dry Run Output:**
+```text
+=================================================================
+ DRY RUN: INSPECTING FORM (ZERO RESPONSES WILL BE SUBMITTED)
+=================================================================
+Target Submission Endpoint: https://docs.google.com/forms/d/e/.../formResponse
+Collects Email Field      : No
+Anti-CSRF fbzx Token      : 614052815911483... (present)
+-----------------------------------------------------------------
+Question #1:
+  Title      : Have you ever used digital lending applications?
+  Type       : Multiple choice
+  Entry ID   : entry.1513773183
+  Required   : True
+  Options    : ['Yes', 'No', 'Maybe']
+...
+[DRY RUN COMPLETE] Schema parsed and verified. 0 submissions sent.
+```
+
+### 2. Submit Synthetic Responses
 Submit 10 test responses with a 1-second delay:
 ```bash
 python fill_form.py "https://docs.google.com/forms/d/e/XXXX/viewform" -n 10 --delay 1.0
 ```
 
-### 3. CLI Options
+### 3. CLI Command Options
 
 | Argument | Type | Default | Description |
 |---|---|---|---|
 | `url` | `str` | *Required* | Public Google Form URL (`/viewform` or `forms.gle`) |
-| `-n` | `int` | `10` | Total number of synthetic responses to submit |
-| `--delay` | `float` | `1.0` | Delay between consecutive submissions (seconds) |
-| `--dry-run` | `flag` | `False` | Inspect questions and preview payload with zero submissions |
+| `-n` | `int` | `10` | Total number of synthetic test responses to submit |
+| `--delay` | `float` | `1.0` | Delay in seconds between consecutive submissions |
+| `--dry-run` | `flag` | `False` | Inspect schema and preview test payload without submitting |
 | `--force` | `flag` | `False` | Safety bypass required when submitting batches > 100 |
 
 ---
 
-## 🛡️ Form Configuration Checklist
+## 📋 Form Configuration Requirements
 
-For this tool to submit test data, your Google Form must be publicly accessible:
+For automated testing, verify these settings in your Google Form (**Settings** tab):
 
-1. **"Limit to 1 response":** Must be **OFF** *(Requires Google sign-in)*.
+1. **"Limit to 1 response":** Must be **OFF** *(Enabling this requires Google account login)*.
 2. **"Collect email addresses":** Set to **"Responder input"** or **"Do not collect"** *(Setting to "Verified" forces Google account login)*.
-3. **Workspace Domain Restrictions:** Must be **disabled** if created under an organizational or university Google Workspace account.
+3. **Workspace Domain Restrictions:** Must be **disabled** if created under an institutional or university Google Workspace.
 
 ---
 
-## 🔍 How It Works
+## ❓ Frequently Asked Questions (FAQ)
 
-1. **Schema Discovery:** Google Forms embeds the full form structure in an inline script assigned to `window.FB_PUBLIC_LOAD_DATA_`. The tool parses this JSON structure to obtain question IDs (`entry.XXXXX`), question types, and option lists.
-2. **Hidden Tokens:** Extracts the `fbzx` anti-spam token and computes the `pageHistory` string for multi-page section breaks.
-3. **Synthetic Payload Construction:** Generates varied, valid data per field type on each iteration.
-4. **Targeted Dispatch:** Replaces the `/viewform` path with `/formResponse` and dispatches standard `application/x-www-form-urlencoded` POST requests.
-5. **Response Integrity Check:** Verifies confirmation markers (e.g. `Your response has been recorded` or container class `vHW8eb`) rather than solely relying on HTTP 200 status codes.
+### Can I use this without a Google Cloud API Key or Service Account?
+**Yes.** This tool interacts with the public web endpoint of your Google Form (`/formResponse`), the exact same way a standard web browser does. No GCP project or API billing is needed.
+
+### How does it generate varying test responses?
+On every iteration, multiple-choice options, dropdowns, and checkboxes are randomly sampled from the form's discovered options. Text inputs use heuristic pattern matching: questions containing "email" receive synthetic emails, questions with "name" receive realistic names, and feedback fields receive randomized testing remarks.
+
+### Will this trigger Google's rate limits or CAPTCHAs?
+When testing in small or medium batches (10–100 responses) with a `--delay` of 1.0s to 1.5s, requests mimic normal browser pacing. Blasting hundreds of requests with `0s` delay may cause Google to throttle your IP address. Always keep a safe delay between submissions.
+
+### How do I clear or delete test submissions after testing?
+In your Google Form editor, navigate to the **Responses** tab, click the **three dots (⋮)** menu in the upper right corner, and select **"Delete all responses"**. If connected to Google Sheets, you can also wipe test rows directly from the spreadsheet.
+
+---
+
+## 🛡️ Ethical Use & Safety Guardrails
+
+> **⚠️ DISCLAIMER:** This project is intended solely for developer testing, automated QA, and educational purposes on forms that you own or have explicit authorization to test. 
+> 
+> Unauthorized automation, spamming, denial-of-service (DoS), or mass-submitting unwanted data to third-party forms violates Google's Terms of Service and this repository's Code of Conduct. Please test responsibly.
 
 ---
 
 ## 📄 License
 
-Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for more information.
+This project is licensed under the [MIT License](LICENSE) — free for personal, academic, and commercial use.
 
 ---
 
-## 🤝 Contributing
+## 🌟 Show Your Support
 
-Contributions, issues, and feature requests are welcome!
-Feel free to check the [issues page](https://github.com/Ali-HF/google-forms-test-filler/issues).
+If this tool saved you time testing your Google Forms or Google Sheets workflows, consider giving it a **Star ⭐** on GitHub!
