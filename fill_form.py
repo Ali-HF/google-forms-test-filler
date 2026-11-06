@@ -29,7 +29,6 @@ HEADERS = {
     )
 }
 
-# General synthetic datasets for realistic test entries
 NAMES = [
     "Alex Mercer", "Jordan Lee", "Taylor Swift", "Samira Khan", "Omar Farooq",
     "Chris Evans", "Morgan Bailey", "Zain Malik", "Fatima Noor", "Devon Patel",
@@ -45,6 +44,43 @@ FEEDBACK_TEMPLATES = [
     "Feedback recorded for load and submission verification.",
     "Checking question field rendering and multi-page form progress.",
     "Automated data generation test for survey workflow verification."
+]
+
+CAMPUS_CLEANLINESS_SUGGESTIONS = [
+    "Install more dustbins in crowded areas like the cafeterias and canteen lawns.",
+    "Ensure cleaning staff empty the dustbins more frequently throughout the day.",
+    "Introduce a mobile QR code system for quick reporting of overflowing bins.",
+    "Place separate recycling and organic waste bins across all academic blocks.",
+    "Organize regular student-led campus cleanup drives and awareness campaigns.",
+    "Enforce strict rules and nominal penalties for students caught littering.",
+    "Improve washroom sanitation with regular cleaning schedules and soap availability.",
+    "Display engaging awareness posters on notice boards and student portals.",
+    "Keep covered bins near all outdoor seating areas, pathways, and sports grounds.",
+    "Hire additional maintenance and janitorial staff during peak university hours.",
+    "Involve student societies in promoting civic sense and environmental responsibility.",
+    "Install automated hand sanitizers and hand-wash stations near food courts.",
+    "Conduct weekly cleanliness inspections across all department buildings.",
+    "Add more waste disposal units near student parking zones and main gates.",
+    "Recognize and reward departments that maintain the cleanest premises each semester.",
+    "Repair damaged dustbins and ensure all bins have proper protective lids.",
+    "Launch social media campaigns by university media clubs highlighting clean campus habits.",
+    "Provide clear feedback and tracking when a student reports a maintenance issue.",
+    "Promote reusable bottles and containers at university canteens to reduce plastic waste.",
+    "Ensure corridors and classroom waste bins are cleared before morning lectures begin."
+]
+
+OTHER_DEPTS = [
+    "Software Engineering",
+    "Electrical Engineering",
+    "Computer & Information Systems Engineering",
+    "Electronic Engineering",
+    "Civil Engineering",
+    "Chemical Engineering",
+    "Mechanical Engineering",
+    "Telecommunications Engineering",
+    "Materials Engineering",
+    "Environmental Engineering",
+    "Industrial & Manufacturing Engineering"
 ]
 
 WORDS = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "indigo", "juliet"]
@@ -83,7 +119,6 @@ def load_form(url):
     session = requests.Session()
     session.headers.update(HEADERS)
 
-    # Normalize edit URLs to viewform if passed by accident
     clean_url = re.sub(r"/edit.*$", "/viewform", url)
     try:
         r = session.get(clean_url, timeout=20, allow_redirects=True)
@@ -91,7 +126,6 @@ def load_form(url):
     except Exception as e:
         sys.exit(f"ERROR: Unable to reach form URL ({e})")
 
-    # Guardrail: Check for sign-in gated forms
     if "accounts.google.com" in r.url:
         sys.exit(
             "\n[ACCESS RESTRICTED]\n"
@@ -99,7 +133,6 @@ def load_form(url):
             "Anonymous automated test scripts cannot submit to authentication-gated forms."
         )
 
-    # Extract FB_PUBLIC_LOAD_DATA_
     m = re.search(r"FB_PUBLIC_LOAD_DATA_\s*=\s*(.*?);\s*</script>", r.text, re.DOTALL)
     if not m:
         m = re.search(r"FB_PUBLIC_LOAD_DATA_\s*=\s*(\[.+?\]);", r.text, re.DOTALL)
@@ -111,17 +144,13 @@ def load_form(url):
     except Exception as e:
         sys.exit(f"ERROR: Failed to parse form schema JSON: {e}")
 
-    # Extract hidden anti-spam/CSRF token
     fbzx_match = re.search(r'name="fbzx"\s+value="([^"]+)"', r.text)
     fbzx = fbzx_match.group(1) if fbzx_match else ""
 
-    # Detect if form collects email via responder input
     has_email_field = bool(re.search(r'name="emailAddress"', r.text))
 
-    # Form items are structured inside data[1][1]
     items = data[1][1] if (len(data) > 1 and data[1] and len(data[1]) > 1) else []
 
-    # Derive the /formResponse endpoint
     base_url = r.url.split("?")[0]
     post_url = re.sub(r"/(viewform|edit).*$", "/formResponse", base_url)
     if not post_url.endswith("/formResponse"):
@@ -149,32 +178,30 @@ def text_answer(title, n, validation=None):
     """
     Generates realistic synthetic text answers matching field titles and validation criteria.
     """
-    # Validation format: [type, subtype, [args...], error_msg]
-    # val_type: 1 = Number, 2 = Text, 3 = Length, 4 = Regex
     if validation:
         v_type = validation[0]
         v_sub = validation[1] if len(validation) > 1 else None
         v_args = validation[2] if len(validation) > 2 and validation[2] else []
 
         if v_type == 1:  # Number constraint
-            if v_sub == 7 and len(v_args) >= 2:  # Between
+            if v_sub == 7 and len(v_args) >= 2:
                 try:
                     return str(random.randint(int(float(v_args[0])), int(float(v_args[1]))))
                 except Exception:
                     return "25"
-            elif v_sub in (1, 2) and v_args:  # Greater than / Greater equal
+            elif v_sub in (1, 2) and v_args:
                 try:
                     return str(int(float(v_args[0])) + random.randint(1, 10))
                 except Exception:
                     return "100"
-            elif v_sub in (3, 4) and v_args:  # Less than / Less equal
+            elif v_sub in (3, 4) and v_args:
                 try:
                     return str(max(1, int(float(v_args[0])) - random.randint(1, 5)))
                 except Exception:
                     return "5"
             return str(random.randint(10, 99))
 
-        if v_type == 2:  # Text constraint (email, url, substring)
+        if v_type == 2:  # Text constraint
             if v_sub == 1:
                 return f"test_user_{n}@example.com"
             elif v_sub == 2:
@@ -183,6 +210,21 @@ def text_answer(title, n, validation=None):
                 return f"{v_args[0]}_{random.choice(WORDS)}"
 
     t = (title or "").lower()
+
+    # Department question handling: exactly 39 from CS & IT, remaining 11 from other focus departments
+    if "department" in t or "dept" in t:
+        if n <= 39:
+            return "Computer Science & Information Technology"
+        else:
+            other_idx = (n - 40) % len(OTHER_DEPTS)
+            return OTHER_DEPTS[other_idx]
+
+    # Campus cleanliness suggestion handling
+    if any(k in t for k in ["clean", "tidier", "campus", "garbage", "waste", "litter", "improvement"]):
+        if n % 5 == 0:
+            return random.choice(["More dustbins needed.", "Timely bin clearance is essential.", "Good initiative."])
+        return CAMPUS_CLEANLINESS_SUGGESTIONS[(n - 1) % len(CAMPUS_CLEANLINESS_SUGGESTIONS)]
+
     if "email" in t:
         return f"test{n}@example.com"
     if "name" in t:
@@ -219,7 +261,6 @@ def build_payload(items, n, fbzx, has_email_field):
         if not questions:
             continue
 
-        # Cache column choices for grid items
         grid_column_choices = []
         if qtype == T_GRID:
             for q in questions:
@@ -232,7 +273,6 @@ def build_payload(items, n, fbzx, has_email_field):
             entry = f"entry.{q[0]}"
             opts = q[1] if len(q) > 1 else None
 
-            # Parse question validation rule if defined
             validation_rule = None
             if len(q) > 4 and isinstance(q[4], list) and q[4]:
                 if isinstance(q[4][0], list):
@@ -243,15 +283,41 @@ def build_payload(items, n, fbzx, has_email_field):
 
             elif qtype in (T_RADIO, T_DROPDOWN, T_SCALE):
                 choices = labels(opts)
-                if choices:
+                # If university year question, prefer standard year choices
+                if "year" in (title or "").lower() and any("year" in str(c).lower() for c in choices):
+                    std_years = [c for c in choices if "year" in str(c).lower()]
+                    payload[entry] = random.choice(std_years)
+                elif choices:
                     payload[entry] = random.choice(choices)
 
             elif qtype == T_CHECK:
                 choices = labels(opts)
                 if choices:
-                    # Random non-empty subset
-                    k = random.randint(1, len(choices))
-                    payload[entry] = random.sample(choices, k)
+                    # Filter out negative 'None' options when selecting positive features
+                    none_opts = [c for c in choices if "none" in c.lower()]
+                    positive_opts = [c for c in choices if "none" not in c.lower()]
+
+                    # If there's a 'None' option and we want positive features (95% of the time)
+                    selectable = positive_opts if positive_opts else choices
+
+                    min_k, max_k = 1, len(selectable)
+                    # Checkbox validation rule handling (Type 7 in Google Forms)
+                    if validation_rule and len(validation_rule) >= 3 and validation_rule[0] == 7:
+                        v_sub = validation_rule[1]
+                        v_args = validation_rule[2]
+                        if v_args and str(v_args[0]).isdigit():
+                            target_n = int(v_args[0])
+                            if v_sub == 200:    # Select at least N
+                                min_k = max(min_k, target_n)
+                            elif v_sub == 201:  # Select at most N
+                                max_k = min(max_k, target_n)
+                            elif v_sub == 202:  # Select exactly N
+                                min_k = max_k = target_n
+
+                    min_k = min(min_k, len(selectable))
+                    max_k = max(min_k, min(max_k, len(selectable)))
+                    k = random.randint(min_k, max_k)
+                    payload[entry] = random.sample(selectable, k)
 
             elif qtype == T_GRID:
                 choices = labels(opts) or grid_column_choices
@@ -279,8 +345,7 @@ def build_payload(items, n, fbzx, has_email_field):
 def verify_submission(resp):
     """
     Checks if Google Forms genuinely recorded the submission.
-    Google returns HTTP 200 even when validation or required fields fail,
-    re-rendering the form with errors.
+    Google returns HTTP 200 even when validation or required fields fail.
     """
     if resp.status_code != 200:
         return False, f"HTTP status {resp.status_code}"
@@ -353,9 +418,15 @@ def inspect_form(items, post_url, fbzx, has_email_field):
             print()
 
     print("-" * 65)
-    sample_payload = build_payload(items, 1, fbzx, has_email_field)
-    print("Sample Generated Payload (Run #1):")
-    print(json.dumps(sample_payload, indent=2, ensure_ascii=False))
+    print("Sample Generated Payload (Run #1 - Computer Science & IT):")
+    sample_payload_1 = build_payload(items, 1, fbzx, has_email_field)
+    print(json.dumps(sample_payload_1, indent=2, ensure_ascii=False))
+
+    print("-" * 65)
+    print("Sample Generated Payload (Run #40 - Other Focus Department):")
+    sample_payload_40 = build_payload(items, 40, fbzx, has_email_field)
+    print(json.dumps(sample_payload_40, indent=2, ensure_ascii=False))
+
     print("=" * 65)
     print("[DRY RUN COMPLETE] Schema parsed and verified. 0 submissions sent.")
     print("=" * 65 + "\n")
@@ -372,7 +443,6 @@ def main():
     ap.add_argument("--force", action="store_true", help="Bypass safety limits when submitting >100 responses")
     args = ap.parse_args()
 
-    # Safety Guardrails
     if args.delay < 0:
         sys.exit("ERROR: --delay cannot be negative.")
     if not args.dry_run and args.delay < 0.5:
@@ -409,7 +479,9 @@ def main():
             success, msg = verify_submission(resp)
             if success:
                 ok_count += 1
-                print(f"[{i}/{args.n}] Submitted successfully.")
+                dept_val = payload.get("entry.53644475", "")
+                dept_info = f" ({dept_val})" if dept_val else ""
+                print(f"[{i}/{args.n}] Submitted successfully{dept_info}.")
             else:
                 print(f"[{i}/{args.n}] FAILED: {msg}")
         except Exception as e:
